@@ -4,6 +4,7 @@
 #include "pkt-line.h"
 #include "thread-utils.h"
 #include "unix-socket.h"
+#include "unix-stream-server.h"
 
 #ifdef NO_UNIX_SOCKETS
 #error compat/simple-ipc/ipc-unix-socket.c requires Unix sockets
@@ -728,44 +729,51 @@ static void *accept_thread_proc(void *_accept_thread_data)
  */
 #define LISTEN_BACKLOG (50)
 
-static struct unix_stream_server_socket *create_listener_socket(
+static int create_listener_socket(
 	const char *path,
-	const struct ipc_server_opts *ipc_opts)
+	const struct ipc_server_opts *ipc_opts,
+	struct unix_stream_server_socket **new_server_socket)
 {
 	struct unix_stream_server_socket *server_socket = NULL;
 	struct unix_stream_listen_opts uslg_opts = UNIX_STREAM_LISTEN_OPTS_INIT;
+	int ret;
 
 	uslg_opts.listen_backlog_size = LISTEN_BACKLOG;
 	uslg_opts.disallow_chdir = ipc_opts->uds_disallow_chdir;
 
-	server_socket = unix_stream_server__listen_with_lock(path, &uslg_opts);
-	if (!server_socket)
-		return NULL;
+	ret = unix_stream_server__create(path, &uslg_opts, &server_socket);
+	if (ret)
+		return ret;
 
 	if (set_socket_blocking_flag(server_socket->fd_socket, 1)) {
 		int saved_errno = errno;
-		error_errno(_("could not set listener socket nonblocking '%s'"),
-			    path);
 		unix_stream_server__free(server_socket);
 		errno = saved_errno;
-		return NULL;
+		return -1;
 	}
 
+	*new_server_socket = server_socket;
+
 	trace2_data_string("ipc-server", NULL, "listen-with-lock", path);
-	return server_socket;
+	return 0;
 }
 
-static struct unix_stream_server_socket *setup_listener_socket(
+static int setup_listener_socket(
 	const char *path,
-	const struct ipc_server_opts *ipc_opts)
+	const struct ipc_server_opts *ipc_opts,
+	struct unix_stream_server_socket **new_server_socket)
 {
-	struct unix_stream_server_socket *server_socket;
+	int ret, saved_errno;
 
 	trace2_region_enter("ipc-server", "create-listener_socket", NULL);
-	server_socket = create_listener_socket(path, ipc_opts);
-	trace2_region_leave("ipc-server", "create-listener_socket", NULL);
 
-	return server_socket;
+	ret = create_listener_socket(path, ipc_opts, new_server_socket);
+
+	saved_errno = errno;
+	trace2_region_leave("ipc-server", "create-listener_socket", NULL);
+	errno = saved_errno;
+
+	return ret;
 }
 
 /*
@@ -780,6 +788,7 @@ int ipc_server_run_async(struct ipc_server_data **returned_server_data,
 	struct ipc_server_data *server_data;
 	int sv[2];
 	int k;
+	int ret;
 	int nr_threads = opts->nr_threads;
 
 	*returned_server_data = NULL;
@@ -791,25 +800,23 @@ int ipc_server_run_async(struct ipc_server_data **returned_server_data,
 	 * connection or a shutdown request without spinning.
 	 */
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0)
-		return error_errno(_("could not create socketpair for '%s'"),
-				   path);
+		return -1;
 
 	if (set_socket_blocking_flag(sv[1], 1)) {
 		int saved_errno = errno;
 		close(sv[0]);
 		close(sv[1]);
 		errno = saved_errno;
-		return error_errno(_("making socketpair nonblocking '%s'"),
-				   path);
+		return -1;
 	}
 
-	server_socket = setup_listener_socket(path, opts);
-	if (!server_socket) {
+	ret = setup_listener_socket(path, opts, &server_socket);
+	if (ret) {
 		int saved_errno = errno;
 		close(sv[0]);
 		close(sv[1]);
 		errno = saved_errno;
-		return -1;
+		return ret;
 	}
 
 	server_data = xcalloc(1, sizeof(*server_data));

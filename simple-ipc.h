@@ -178,6 +178,8 @@ struct ipc_server_opts
  *
  * Returns 0 if the asynchronous server pool was started successfully.
  * Returns -1 if not.
+ * Returns -2 if we could not startup because another server is using
+ * the socket or named pipe.
  *
  * When a client IPC message is received, the `application_cb` will be
  * called (possibly on a random thread) to handle the message and
@@ -217,6 +219,8 @@ void ipc_server_free(struct ipc_server_data *server_data);
  *
  * Returns 0 after the server has completed successfully.
  * Returns -1 if the server cannot be started.
+ * Returns -2 if we could not startup because another server is using
+ * the socket or named pipe.
  *
  * When a client IPC message is received, the `application_cb` will be
  * called (possibly on a random thread) to handle the message and

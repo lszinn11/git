@@ -20,7 +20,7 @@ test_expect_success 'start simple command server' '
 '
 
 test_expect_success 'simple command server' '
-	test-tool simple-ipc send ping >actual &&
+	test-tool simple-ipc send --token=ping >actual &&
 	echo pong >expect &&
 	test_cmp expect actual
 '
@@ -31,19 +31,19 @@ test_expect_success 'servers cannot share the same path' '
 '
 
 test_expect_success 'big response' '
-	test-tool simple-ipc send big >actual &&
+	test-tool simple-ipc send --token=big >actual &&
 	test_line_count -ge 10000 actual &&
 	grep -q "big: [0]*9999\$" actual
 '
 
 test_expect_success 'chunk response' '
-	test-tool simple-ipc send chunk >actual &&
+	test-tool simple-ipc send --token=chunk >actual &&
 	test_line_count -ge 10000 actual &&
 	grep -q "big: [0]*9999\$" actual
 '
 
 test_expect_success 'slow response' '
-	test-tool simple-ipc send slow >actual &&
+	test-tool simple-ipc send --token=slow >actual &&
 	test_line_count -ge 100 actual &&
 	grep -q "big: [0]*99\$" actual
 '
@@ -116,7 +116,7 @@ test_expect_success 'stress test threads' '
 test_expect_success 'stop-daemon works' '
 	test-tool simple-ipc stop-daemon &&
 	test_must_fail test-tool simple-ipc is-active &&
-	test_must_fail test-tool simple-ipc send ping
+	test_must_fail test-tool simple-ipc send --token=ping
 '
 
 test_done

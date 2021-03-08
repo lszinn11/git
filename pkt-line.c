@@ -250,22 +250,25 @@ void packet_buf_write_len(struct strbuf *buf, const char *data, size_t len)
 	packet_trace(data, len, 1);
 }
 
-int write_packetized_from_fd_no_flush(int fd_in, int fd_out,
-				      struct packet_scratch_space *scratch)
+int write_packetized_from_fd_no_flush(int fd_in, int fd_out)
 {
 	int err = 0;
 	ssize_t bytes_to_write;
+	char *buf = xmalloc(LARGE_PACKET_DATA_MAX);
 
 	while (!err) {
-		bytes_to_write = xread(fd_in, scratch->buffer,
-				       sizeof(scratch->buffer));
-		if (bytes_to_write < 0)
-			return COPY_READ_ERROR;
+		bytes_to_write = xread(fd_in, buf, LARGE_PACKET_DATA_MAX);
+		if (bytes_to_write < 0) {
+			err = COPY_READ_ERROR;
+			break;
+		}
 		if (bytes_to_write == 0)
 			break;
-		err = packet_write_gently(fd_out, scratch->buffer,
-					  bytes_to_write);
+		err = packet_write_gently(fd_out, buf, bytes_to_write);
 	}
+
+	free(buf);
+
 	return err;
 }
 

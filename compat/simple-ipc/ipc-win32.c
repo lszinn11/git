@@ -614,14 +614,16 @@ int ipc_server_run_async(struct ipc_server_data **returned_server_data,
 	*returned_server_data = NULL;
 
 	ret = initialize_pipe_name(path, wpath, ARRAY_SIZE(wpath));
-	if (ret < 0)
-		return error(
-			_("could not create normalized wchar_t path for '%s'"),
-			path);
+	if (ret < 0) {
+		errno = EINVAL;
+		return -1;
+	}
 
 	hPipeFirst = create_new_pipe(wpath, 1);
-	if (hPipeFirst == INVALID_HANDLE_VALUE)
-		return error(_("IPC server already running on '%s'"), path);
+	if (hPipeFirst == INVALID_HANDLE_VALUE) {
+		errno = EADDRINUSE;
+		return -2;
+	}
 
 	server_data = xcalloc(1, sizeof(*server_data));
 	server_data->magic = MAGIC_SERVER_DATA;
