@@ -9,7 +9,7 @@ SYNOPSIS
 --------
 [verse]
 'git commit' [-a | --interactive | --patch] [-s] [-v] [-u<mode>] [--amend]
-	   [--dry-run] [(-c | -C | --fixup | --squash) <commit>]
+	   [--dry-run] [(-c | -C | --squash) <commit> | --fixup [(amend|reword):]<commit>)]
 	   [-F <file> | -m <msg>] [--reset-author] [--allow-empty]
 	   [--allow-empty-message] [--no-verify] [-e] [--author=<author>]
 	   [--date=<date>] [--cleanup=<mode>] [--[no-]status]
@@ -86,11 +86,39 @@ OPTIONS
 	Like '-C', but with `-c` the editor is invoked, so that
 	the user can further edit the commit message.
 
---fixup=<commit>::
-	Construct a commit message for use with `rebase --autosquash`.
-	The commit message will be the subject line from the specified
-	commit with a prefix of "fixup! ".  See linkgit:git-rebase[1]
-	for details.
+--fixup=[(amend|reword):]<commit>::
+	Without `amend:` or `reword:`, create a `fixup!` commit where
+	the commit message will be the subject line from the specified
+	commit with a prefix of "fixup!'". The resulting "fixup!" commit
+	is further used with `git rebase --autosquash` to fixup the
+	content of the specified commit.
++
+The `--fixup=amend:<commit>` form creates an "amend!" commit to
+fixup both the content and the commit log message of the specified
+commit. The resulting "amend!" commit's commit message subject
+will be the subject line from the specified commit with a prefix of
+"amend!'" and the message body will be commit log message of the
+specified commit. It also invokes an editor seeded with the log
+message of the "amend!" commit to allow to edit further. And it
+refuses to create "amend!" commit if it's commit message body is
+empty unless used with the `--allow-empty-message` option. "amend!"
+commit when rebased with `--autosquash` will fixup the contents and
+replace the commit message of the specified commit with the "amend!"
+commit's message body.
++
+The `--fixup=reword:<commit>` form creates an "amend!" commit similar
+to `--fixup=amend:<commit>` creates, but it records the same tree as
+`HEAD`, i.e. it does not take any staged changes and only allows to
+fixup the commit message of the specified commit. It will reword the
+specified commit when it is rebased with `--autosquash`.
++
+The `--fixup=amend:` and `--fixup=reword:` forms cannot be used with
+other options to add to the commit log message i.e it is incompatible
+with `-m`/`-F`/`-c`/`-C` options.
++
+Also, after fixing the commit using `--fixup`, with or without option
+and rebased with `--autosquash`, the authorship of the original commit
+remains unchanged. See linkgit:git-rebase[1] for details.
 
 --squash=<commit>::
 	Construct a commit message for use with `rebase --autosquash`.
